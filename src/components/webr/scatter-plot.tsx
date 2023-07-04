@@ -32,7 +32,9 @@ Chart.register(
   Legend
 )
 
-const webR = new WebR()
+const webR = new WebR({
+  serviceWorkerUrl: "http://localhost:3000/webr-serviceworker.js",
+})
 
 type ScatterPlotProps = {
   path: string
@@ -95,7 +97,7 @@ export const ScatterPlot = ({ path }: ScatterPlotProps) => {
     if (xColumn && yColumn) {
       loadData()
     }
-  }, [xColumn, yColumn])
+  }, [path, xColumn, yColumn])
 
   return (
     <div>
