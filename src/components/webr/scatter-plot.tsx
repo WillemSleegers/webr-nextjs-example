@@ -2,7 +2,14 @@
 
 import { WebR } from "@r-wasm/webr"
 import { WebRDataJsNode, WebRDataJsAtomic } from "@r-wasm/webr/robj"
-import { useState, useEffect, ChangeEvent } from "react"
+import { useState, useEffect } from "react"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import {
   Chart,
   CategoryScale,
@@ -37,17 +44,9 @@ export const ScatterPlot = ({ path }: ScatterPlotProps) => {
   const [yColumn, setYColumn] = useState<string>()
   const [data, setData] = useState<{ x: any; y: any }[]>()
 
-  const handleXColumn = (e: ChangeEvent<HTMLSelectElement>) => {
-    setXColumn(e.target.value)
-  }
-  const handleYColumn = (e: ChangeEvent<HTMLSelectElement>) => {
-    setYColumn(e.target.value)
-  }
-
   useEffect(() => {
     async function loadColumns() {
       await webR.init()
-      console.log("loading columns init")
       const columnsR = await webR.evalRRaw(
         `
           data <- read.csv("${path}", nrows = 1)
@@ -65,7 +64,6 @@ export const ScatterPlot = ({ path }: ScatterPlotProps) => {
   useEffect(() => {
     async function loadData() {
       await webR.init()
-      console.log("single line chart init")
       const webRData = await webR.evalR(
         `
           data <- read.csv("${path}")
@@ -88,8 +86,6 @@ export const ScatterPlot = ({ path }: ScatterPlotProps) => {
             y: yDataJs.values[i],
           }
         })
-
-        console.log(chartData)
         setData(chartData)
       } finally {
         webR.destroy(webRData)
@@ -158,45 +154,30 @@ export const ScatterPlot = ({ path }: ScatterPlotProps) => {
       )}
       {columns && (
         <div className="flex gap-3">
-          <div>
-            <label
-              htmlFor="columnX"
-              className="block mb-2 text-sm font-medium text-gray-900 dark:text-white"
-            >
-              X-axis
-            </label>
-            {columns && (
-              <select
-                id="columnX"
-                onChange={handleXColumn}
-                defaultValue={xColumn}
-                className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
-              >
-                {columns?.map((column) => (
-                  <option key={column}>{column}</option>
-                ))}
-              </select>
-            )}
-          </div>
-          <div>
-            <label
-              htmlFor="columnY"
-              className="block mb-2 text-sm font-medium text-gray-900 dark:text-white"
-            >
-              Y-axis
-            </label>
-
-            <select
-              id="columnY"
-              onChange={handleYColumn}
-              defaultValue={yColumn}
-              className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
-            >
+          <Select onValueChange={(x) => setXColumn(x)}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="x-axis" />
+            </SelectTrigger>
+            <SelectContent>
               {columns?.map((column) => (
-                <option key={column}>{column}</option>
+                <SelectItem key={column} value={column}>
+                  {column}
+                </SelectItem>
               ))}
-            </select>
-          </div>
+            </SelectContent>
+          </Select>
+          <Select onValueChange={(y) => setYColumn(y)}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="y-axis" />
+            </SelectTrigger>
+            <SelectContent>
+              {columns?.map((column) => (
+                <SelectItem key={column} value={column}>
+                  {column}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       )}
     </div>
