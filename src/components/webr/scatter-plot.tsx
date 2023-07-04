@@ -32,9 +32,7 @@ Chart.register(
   Legend
 )
 
-const webR = new WebR({
-  serviceWorkerUrl: "http://localhost:3000/webr-serviceworker.js",
-})
+const webR = new WebR()
 
 type ScatterPlotProps = {
   path: string
