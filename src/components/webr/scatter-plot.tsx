@@ -2,14 +2,9 @@
 
 import { WebR } from "@r-wasm/webr"
 import { WebRDataJsNode, WebRDataJsAtomic } from "@r-wasm/webr/robj"
-import { useState, useEffect } from "react"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+import { useState, useEffect, ChangeEvent } from "react"
+import { Label } from "@/components/ui/label"
+import { Input } from "@/components/ui/input"
 import {
   Chart,
   CategoryScale,
@@ -20,7 +15,8 @@ import {
   Tooltip,
   Legend,
 } from "chart.js"
-import { Line } from "react-chartjs-2"
+import { Scatter } from "react-chartjs-2"
+import { Button } from "../ui/button"
 
 Chart.register(
   CategoryScale,
@@ -34,152 +30,131 @@ Chart.register(
 
 const webR = new WebR()
 
-type ScatterPlotProps = {
-  path: string
-}
-
-export const ScatterPlot = ({ path }: ScatterPlotProps) => {
-  const [columns, setColumns] = useState<string[]>()
-  const [xColumn, setXColumn] = useState<string>()
-  const [yColumn, setYColumn] = useState<string>()
+export const ScatterPlot = () => {
+  const [sampleSize, setSampleSize] = useState(100)
+  const [correlation, setCorrelation] = useState(0.5)
   const [data, setData] = useState<{ x: any; y: any }[]>()
 
-  useEffect(() => {
-    async function loadColumns() {
-      await webR.init()
-      const columnsR = await webR.evalRRaw(
-        `
-          data <- read.csv("${path}", nrows = 1)
-          colnames(data)
-        `,
-        "string[]"
-      )
-      setColumns(columnsR)
-      setXColumn(columnsR[0])
-      setYColumn(columnsR[1])
+  async function simulate() {
+    await webR.init()
+    const webRData = await webR.evalR(
+      `
+        N <- ${sampleSize}
+        rho <- ${correlation}
+        x1 <- rnorm(n = N, mean = 0, sd = 1)
+        x2 <- (rho * x1) + sqrt(1 - rho * rho) * rnorm(n = N, mean = 0, sd = 1)
+
+        data.frame(
+          x = x1,
+          y = x2
+        )
+      `
+    )
+    try {
+      const webRDataJs = (await webRData.toJs()) as WebRDataJsNode
+
+      const xDataJs = webRDataJs.values[0] as WebRDataJsAtomic<any[]>
+      const yDataJs = webRDataJs.values[1] as WebRDataJsAtomic<any[]>
+
+      const chartData = xDataJs.values.map((_value, i) => {
+        return {
+          x: xDataJs.values[i],
+          y: yDataJs.values[i],
+        }
+      })
+      setData(chartData)
+    } finally {
+      webR.destroy(webRData)
     }
-    loadColumns()
+  }
+
+  const handleSampleSizeChange = (e: ChangeEvent<HTMLInputElement>) => {
+    setSampleSize(Math.min(Math.max(e.target.valueAsNumber, 1), 1000))
+  }
+
+  const handleCorrelationChange = (e: ChangeEvent<HTMLInputElement>) => {
+    setCorrelation(Math.min(Math.max(e.target.valueAsNumber, -1), 1))
+  }
+
+  useEffect(() => {
+    simulate()
   }, [])
-
-  useEffect(() => {
-    async function loadData() {
-      await webR.init()
-      const webRData = await webR.evalR(
-        `
-          data <- read.csv("${path}")
-
-          data.frame(
-            x = data["${xColumn}"],
-            y = data["${yColumn}"]
-          )
-        `
-      )
-      try {
-        const webRDataJs = (await webRData.toJs()) as WebRDataJsNode
-
-        const xDataJs = webRDataJs.values[0] as WebRDataJsAtomic<any[]>
-        const yDataJs = webRDataJs.values[1] as WebRDataJsAtomic<any[]>
-
-        const chartData = xDataJs.values.map((value, i) => {
-          return {
-            x: xDataJs.values[i],
-            y: yDataJs.values[i],
-          }
-        })
-        setData(chartData)
-      } finally {
-        webR.destroy(webRData)
-      }
-    }
-
-    if (xColumn && yColumn) {
-      loadData()
-    }
-  }, [path, xColumn, yColumn])
 
   return (
     <div>
-      {data && xColumn && yColumn && (
-        <Line
-          options={{
-            responsive: true,
-            scales: {
-              x: {
-                title: {
-                  display: true,
-                  text: xColumn,
-                  color: "#9CA3AF",
-                },
-                ticks: {
-                  color: "#9CA3AF",
-                },
-                grid: {
-                  color: "#374151",
-                },
+      <Scatter
+        options={{
+          responsive: true,
+          scales: {
+            x: {
+              title: {
+                display: true,
+                text: "X",
+                color: "#9CA3AF",
               },
-              y: {
-                title: {
-                  display: true,
-                  text: yColumn,
-                  color: "#9CA3AF",
-                },
-                ticks: {
-                  color: "#9CA3AF",
-                },
-                grid: {
-                  color: "#374151",
-                },
+              ticks: {
+                color: "#9CA3AF",
+              },
+              grid: {
+                color: "#374151",
               },
             },
-            plugins: {
-              tooltip: {
-                callbacks: {},
+            y: {
+              title: {
+                display: true,
+                text: "Y",
+                color: "#9CA3AF",
               },
-              legend: {
-                display: false,
+              ticks: {
+                color: "#9CA3AF",
+              },
+              grid: {
+                color: "#374151",
               },
             },
-          }}
-          data={{
-            datasets: [
-              {
-                label: "Dataset 1",
-                data: data,
-                borderColor: "#1A56DB",
-                backgroundColor: "#1A56DB",
-              },
-            ],
-          }}
+          },
+          plugins: {
+            tooltip: {
+              callbacks: {},
+            },
+            legend: {
+              display: false,
+            },
+          },
+        }}
+        data={{
+          datasets: [
+            {
+              label: "Dataset 1",
+              data: data,
+              borderColor: "#1A56DB",
+              backgroundColor: "#1A56DB",
+            },
+          ],
+        }}
+      />
+      <div className="max-w-xs flex flex-col gap-3">
+        <Label htmlFor="sampleSize">Sample size</Label>
+        <Input
+          id="sampleSize"
+          type="number"
+          min={1}
+          max={1000}
+          value={sampleSize}
+          onChange={handleSampleSizeChange}
         />
-      )}
-      {columns && (
-        <div className="flex gap-3">
-          <Select onValueChange={(x) => setXColumn(x)}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="x-axis" />
-            </SelectTrigger>
-            <SelectContent>
-              {columns?.map((column) => (
-                <SelectItem key={column} value={column}>
-                  {column}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select onValueChange={(y) => setYColumn(y)}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="y-axis" />
-            </SelectTrigger>
-            <SelectContent>
-              {columns?.map((column) => (
-                <SelectItem key={column} value={column}>
-                  {column}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      )}
+        <Label htmlFor="correlation">Correlation</Label>
+        <Input
+          id="correlation"
+          type="number"
+          min={-1}
+          max={1}
+          step={0.1}
+          value={correlation}
+          onChange={handleCorrelationChange}
+        />
+        <Button onClick={simulate}>Simulate</Button>
+      </div>
     </div>
   )
 }
