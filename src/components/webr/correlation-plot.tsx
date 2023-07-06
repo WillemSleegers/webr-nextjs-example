@@ -17,6 +17,7 @@ import {
   Tooltip,
   Legend,
   ScatterController,
+  LineController,
 } from "chart.js"
 import { Chart } from "react-chartjs-2"
 
@@ -28,7 +29,8 @@ ChartJS.register(
   Title,
   Tooltip,
   Legend,
-  ScatterController
+  ScatterController,
+  LineController
 )
 
 const webR = new WebR()
