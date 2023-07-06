@@ -1,12 +1,14 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import { WebR } from "@r-wasm/webr"
-import { WebRDataJsNode, WebRDataJsAtomic } from "@r-wasm/webr/robj"
-import { useState, useEffect, ChangeEvent } from "react"
+import { RDataFrameToObject } from "@/lib/utils"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
+import { Button } from "@/components/ui/button"
+import { Slider } from "@/components/ui/slider"
 import {
-  Chart,
+  Chart as ChartJS,
   CategoryScale,
   LinearScale,
   PointElement,
@@ -15,10 +17,9 @@ import {
   Tooltip,
   Legend,
 } from "chart.js"
-import { Scatter } from "react-chartjs-2"
-import { Button } from "../ui/button"
+import { Chart } from "react-chartjs-2"
 
-Chart.register(
+ChartJS.register(
   CategoryScale,
   LinearScale,
   PointElement,
@@ -30,50 +31,68 @@ Chart.register(
 
 const webR = new WebR()
 
-export const ScatterPlot = () => {
+export const CorrelationPlot = () => {
   const [sampleSize, setSampleSize] = useState(100)
   const [correlation, setCorrelation] = useState(0.5)
-  const [data, setData] = useState<{ x: any; y: any }[]>()
+  const [scatterData, setScatterData] = useState<{ x: number; y: number }[]>()
+  const [lineData, setLineData] = useState<{ x: number; y: any }[]>()
 
   async function simulate() {
     await webR.init()
     const webRData = await webR.evalR(
       `
+        scale_values <- function(x) {(x-min(x)) / (max(x) - min(x))}
+
         N <- ${sampleSize}
         rho <- ${correlation}
         x1 <- rnorm(n = N, mean = 0, sd = 1)
         x2 <- (rho * x1) + sqrt(1 - rho * rho) * rnorm(n = N, mean = 0, sd = 1)
 
+        x1 <- scale_values(x1)
+        x2 <- scale_values(x2)
+
+        model <- lm(x2 ~ x1)
+        fit <- predict(model)
+
         data.frame(
           x = x1,
-          y = x2
+          y = x2,
+          fit = fit
         )
       `
     )
     try {
-      const webRDataJs = (await webRData.toJs()) as WebRDataJsNode
+      const df = await RDataFrameToObject(webRData)
 
-      const xDataJs = webRDataJs.values[0] as WebRDataJsAtomic<any[]>
-      const yDataJs = webRDataJs.values[1] as WebRDataJsAtomic<any[]>
+      const x = df.x as number[]
+      const y = df.y as number[]
+      const fit = df.fit as number[]
 
-      const chartData = xDataJs.values.map((_value, i) => {
+      const chartScatterData = x.map((_value, i) => {
         return {
-          x: xDataJs.values[i],
-          y: yDataJs.values[i],
+          x: x[i],
+          y: y[i],
         }
       })
-      setData(chartData)
+      setScatterData(chartScatterData)
+
+      const indexMin = x.indexOf(Math.min(...x))
+      const indexMax = x.indexOf(Math.max(...x))
+
+      const chartLineData = [
+        {
+          x: x[indexMin],
+          y: fit[indexMin],
+        },
+        {
+          x: x[indexMax],
+          y: fit[indexMax],
+        },
+      ]
+      setLineData(chartLineData)
     } finally {
       webR.destroy(webRData)
     }
-  }
-
-  const handleSampleSizeChange = (e: ChangeEvent<HTMLInputElement>) => {
-    setSampleSize(Math.min(Math.max(e.target.valueAsNumber, 1), 1000))
-  }
-
-  const handleCorrelationChange = (e: ChangeEvent<HTMLInputElement>) => {
-    setCorrelation(Math.min(Math.max(e.target.valueAsNumber, -1), 1))
   }
 
   useEffect(() => {
@@ -82,7 +101,8 @@ export const ScatterPlot = () => {
 
   return (
     <div>
-      <Scatter
+      <Chart
+        type="scatter"
         options={{
           responsive: true,
           scales: {
@@ -125,8 +145,16 @@ export const ScatterPlot = () => {
         data={{
           datasets: [
             {
+              type: "scatter",
               label: "Dataset 1",
-              data: data,
+              data: scatterData,
+              borderColor: "#1A56DB",
+              backgroundColor: "#1A56DB",
+            },
+            {
+              type: "line",
+              label: "Dataset 2",
+              data: lineData,
               borderColor: "#1A56DB",
               backgroundColor: "#1A56DB",
             },
@@ -141,19 +169,25 @@ export const ScatterPlot = () => {
           min={1}
           max={1000}
           value={sampleSize}
-          onChange={handleSampleSizeChange}
+          onChange={(e) =>
+            setSampleSize(Math.min(Math.max(e.target.valueAsNumber, 1), 1000))
+          }
         />
         <Label htmlFor="correlation">Correlation</Label>
-        <Input
-          id="correlation"
-          type="number"
-          min={-1}
-          max={1}
-          step={0.1}
-          value={correlation}
-          onChange={handleCorrelationChange}
-        />
-        <Button onClick={simulate}>Simulate</Button>
+        <div className="flex space-x-3">
+          <Slider
+            id="correlation"
+            defaultValue={[0.5]}
+            min={-1}
+            max={1}
+            step={0.01}
+            onValueChange={(number) => setCorrelation(number[0])}
+          />
+          <Label>{correlation}</Label>
+        </div>
+        <Button className="mt-3" onClick={simulate}>
+          Simulate
+        </Button>
       </div>
     </div>
   )
