@@ -187,7 +187,7 @@ export const CorrelationPlot = () => {
             step={0.01}
             onValueChange={(number) => setCorrelation(number[0])}
           />
-          <Label>{correlation}</Label>
+          <Label className="w-11 overflow-hidden">{correlation}</Label>
         </div>
         <Button className="mt-3" onClick={simulate}>
           Simulate
