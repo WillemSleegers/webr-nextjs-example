@@ -3,25 +3,32 @@
 import { useState, useEffect } from "react"
 import { WebR } from "webr"
 
-type RandomNumbersProps = {
+type DataFrameProps = {
   webR: WebR
 }
 
-export const RandomNumbers = ({ webR }: RandomNumbersProps) => {
+export const DataFrame = ({ webR }: DataFrameProps) => {
   const [status, setStatus] = useState("Loading webR...")
-  const [values, setValues] = useState<number[]>([])
+  const [values, setValues] = useState<any>()
 
-  async function getRandomNumbers() {
+  async function createDataFrame() {
     await webR.init()
-    const result = await webR.evalRRaw("rnorm(20,10,10)", "number[]")
+
+    const data = [
+      { a: 0, b: "x" },
+      { a: 1, b: "y" },
+    ]
+    const result = await new webR.RObject(data)
+    await webR.objs.globalEnv.bind("foo", result)
+    await webR.evalR("print(class(foo))")
 
     return result
   }
 
   useEffect(() => {
     ;(async () => {
-      setStatus("Getting random numbers")
-      const values = await getRandomNumbers()
+      setStatus("Creating data frame")
+      const values = await createDataFrame()
       setValues(values)
       setStatus("Ready")
     })()
@@ -33,9 +40,6 @@ export const RandomNumbers = ({ webR }: RandomNumbersProps) => {
       {status == "Ready" && (
         <div>
           <p>Result of running R code:</p>
-          {values.map((n, idx) => (
-            <p key={idx}>{n}</p>
-          ))}
         </div>
       )}
     </div>
